@@ -1,0 +1,44 @@
+pipeline {
+    agent any
+    tools{
+	   maven "apache-maven-3.8.6"
+	   jdk "openjdk-17.0.7.0.7"
+	 }
+
+    stages {
+        stage("git clone"){
+           steps {
+                sshagent(['jenkins_Git_SSH_Access']) {
+                  git 'git@git.servdev.mdef.es:lmunma1/experimento-siacudef.git'
+                }
+            }
+        }
+        stage('Build') {
+            steps {
+                catchError(buildResult: null, catchInterruptions: false) {
+                    withMaven() {
+                        sh 'mvn --version'
+                        sh 'mvn -Djdk.tls.maxCertificateChainLength=20 -Djavax.net.ssl.trustStore=/etc/pki/ca-trust/extracted/java/cacerts -Djava.net.ssl.trustStorePassword=changeit -f source/pom.xml clean install' 
+                }
+            }
+            }
+            post {
+                always {
+                    echo "CurrentResult: $currentBuild.currentResult" // -> UNSTABLE
+                    echo "Result: $currentBuild.result"               // -> UNSTABLE
+                }
+            }
+        }
+
+        stage('Deploy') {
+            when {
+                expression {
+                    currentBuild.result == "SUCCESS"
+                }
+            }
+            steps {
+                echo 'Deploy'
+            }
+        }
+    }
+}
